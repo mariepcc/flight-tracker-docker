@@ -11,6 +11,6 @@ class FlightEntry(BaseModel):
     departure_date: str
     departure_time: str
     arrival_time: str
-    duration: str
+    duration: int
     stop_airports: Optional[list[str]] = None
     model_config = ConfigDict(from_attributes=True)

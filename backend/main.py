@@ -32,31 +32,54 @@ app.add_middleware(
 )
 
 
-@app.get("/results")
+@app.get("/tracked-flights")
 async def results(db: Session = Depends(get_db)):
     subquery = (
-        db.query(
-            Offer.destination_city,
-            func.min(Offer.price).label("min_price"),
-        )
-        .group_by(Offer.destination_city, Offer.departure_date)
+        db.query(func.max(Offer.id).label("latest_id"))
+        .group_by(Offer.origin_code, Offer.destination_code, Offer.departure_date)
         .subquery()
     )
 
-    cheapest_offers = (
-        db.query(Offer)
-        .join(
-            subquery,
-            (Offer.destination_city == subquery.c.destination_city)
-            & (Offer.price == subquery.c.min_price),
+    latest_offers = db.query(Offer).filter(Offer.id.in_(subquery)).all()
+
+    if not latest_offers:
+        return []
+
+    results = []
+    for offer in latest_offers:
+        history = (
+            db.query(Offer.price, Offer.created_at)
+            .filter(
+                Offer.origin_code == offer.origin_code,
+                Offer.destination_code == offer.destination_code,
+                Offer.departure_date == offer.departure_date,
+            )
+            .order_by(Offer.created_at.asc())
+            .all()
         )
-        .all()
-    )
 
-    if not cheapest_offers:
-        return {"message": "Brak zapisanych lotów w bazie danych."}
+        price_history = [
+            {"price": h.price, "fetched_at": h.created_at} for h in history
+        ]
 
-    return cheapest_offers
+        results.append(
+            {
+                "id": offer.id,
+                "origin_code": offer.origin_code,
+                "origin_airport": offer.origin_airport,
+                "destination_code": offer.destination_code,
+                "destination_airport": offer.destination_airport,
+                "price": offer.price,
+                "departure_date": offer.departure_date,
+                "departure_time": offer.departure_time,
+                "arrival_time": offer.arrival_time,
+                "duration": offer.duration,
+                "stop_airports": offer.stop_airports,
+                "price_history": price_history,
+            }
+        )
+
+    return results
 
 
 @app.get("/get-flights")
@@ -105,6 +128,7 @@ async def update_flight():
 @app.post("/add-flight")
 async def add_flight(flight: FlightEntry, db: Session = Depends(get_db)):
     try:
+        stops = ", ".join(flight.stop_airports) if flight.stop_airports else ""
         new_flight = Offer(
             origin_code=flight.origin_code,
             origin_airport=flight.origin_airport,
@@ -115,7 +139,7 @@ async def add_flight(flight: FlightEntry, db: Session = Depends(get_db)):
             departure_time=flight.departure_time,
             arrival_time=flight.arrival_time,
             duration=flight.duration,
-            stop_airports=flight.stop_airports,
+            stop_airports=stops,
         )
 
         db.add(new_flight)
@@ -137,19 +161,17 @@ async def delete_flight(
     flight_dest: str, departure_date: str, db: Session = Depends(get_db)
 ):
     try:
-        flight = (
-            db.query(Offer)
-            .filter(
-                Offer.destination_code
-                == flight_dest & Offer.departure_date
-                == departure_date
-            )
-            .all()
+        query = db.query(Offer).filter(
+            Offer.destination_code == flight_dest,
+            Offer.departure_date == departure_date,
         )
-        if not flight:
-            raise HTTPException(status_code=404, detail="Flight not found")
+        if query.count() == 0:
+            raise HTTPException(
+                status_code=404, detail="Nie znaleziono lotów do usunięcia"
+            )
 
-        db.delete(flight)
+        query.delete(synchronize_session=False)
+
         db.commit()
 
         return {"status": "success", "message": "Flight deleted successfully"}

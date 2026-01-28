@@ -2,9 +2,58 @@
 
 import React, { useState } from "react";
 import { Heart, Plane, Clock, TrendingDown } from "lucide-react";
+import axios from "axios";
+import { toast } from "sonner";
+import { set } from "date-fns";
 
-export default function SingleFlightResult({ flight }: { flight: any }) {
+export default function SingleFlightResult({
+  flight,
+  departure_date,
+}: {
+  flight: any;
+  departure_date: string;
+}) {
   const [isFavorite, setIsFavorite] = useState(false);
+
+  const toggleFavourite = async () => {
+    try {
+      setIsFavorite(!isFavorite);
+      if (!isFavorite) {
+        await axios.post("http://localhost:8000/add-flight", {
+          origin_code: flight.origin_code,
+          origin_airport: flight.origin_airport,
+          destination_code: flight.destination_code,
+          destination_airport: flight.destination_airport,
+          price: parseInt(flight.price),
+          departure_date: departure_date,
+          departure_time: flight.departure_time,
+          arrival_time: flight.arrival_time,
+          duration: parseInt(flight.duration),
+          stop_airports: flight.stop_airports || [],
+        });
+        toast.success("Added to wishlist", {
+          description: `Tracking prices for ${flight.destination_code} on ${departure_date}`,
+        });
+      } else {
+        setIsFavorite(!isFavorite);
+        await axios.delete("http://localhost:8000/delete-flight", {
+          params: {
+            flight_dest: flight.destination_code,
+            departure_date: departure_date,
+          },
+        });
+        toast.info("Removed from wishlist", {
+          description: `No longer tracking ${flight.destination_code}`,
+        });
+      }
+    } catch (error) {
+      setIsFavorite(!isFavorite);
+      console.error("Error updating wishlist:", error);
+      toast.error("Operation failed", {
+        description: "Please check your server connection.",
+      });
+    }
+  };
 
   return (
     <div className="glass-card p-px bg-linear-to-br from-rose-900/40 via-purple-500/40 to-indigo-500/40">
@@ -17,15 +66,20 @@ export default function SingleFlightResult({ flight }: { flight: any }) {
               </span>
             </div>
             <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
-              {flight.departure_date}
+              {departure_date}
             </span>
           </div>
           <button
-            onClick={() => setIsFavorite(!isFavorite)}
+            onClick={toggleFavourite}
+            aria-label="Add to wishlist"
             className="p-3 rounded-xl bg-white/3 hover:bg-white/8 transition-all"
           >
             <Heart
-              className={`w-5 h-5 transition-all duration-500 ${isFavorite ? "fill-rose-800 text-rose-800 scale-110" : "text-slate-700"}`}
+              className={`w-5 h-5 transition-all duration-500 ${
+                isFavorite
+                  ? "fill-rose-800 text-rose-800 scale-110"
+                  : "text-slate-700"
+              }`}
             />
           </button>
         </div>

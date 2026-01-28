@@ -100,7 +100,7 @@ export default function SearchForm({
         <div className="relative flex items-center justify-center gap-3">
           <Plane className="w-5 h-5 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
           <span className="text-sm font-black uppercase tracking-[0.2em] italic">
-            Search Flights
+            Search For The Best Flight
           </span>
         </div>
       </Button>

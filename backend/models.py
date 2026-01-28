@@ -1,5 +1,5 @@
 from database import Base
-from sqlalchemy import Column, Integer, String, TIMESTAMP, text
+from sqlalchemy import Column, Date, Integer, String, text
 
 
 class Offer(Base):
@@ -14,6 +14,6 @@ class Offer(Base):
     departure_date = Column(String, nullable=False)
     departure_time = Column(String, nullable=True)
     arrival_time = Column(String, nullable=True)
-    duration = Column(String, nullable=True)
+    duration = Column(Integer, nullable=True)
     stop_airports = Column(String, nullable=True)
-    created_at = Column(TIMESTAMP(timezone=True), server_default=text("now()"))
+    created_at = Column(Date, server_default=text("CURRENT_DATE"))
