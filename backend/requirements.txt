@@ -3,4 +3,5 @@ uvicorn
 pydantic
 sqlalchemy
 dotenv
-psycopg2
+psycopg2-binary
+google-search-results

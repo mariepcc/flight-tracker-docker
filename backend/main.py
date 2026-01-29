@@ -120,9 +120,50 @@ def get_flights(origin: str, destination: str, date: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/update-price")
-async def update_flight():
-    return {"message": "Flight updated successfully"}
+@app.post("/update-tracked-flights")
+async def update_prices(db: Session = Depends(get_db)):
+    flights = (
+        db.query(
+            Offer.origin_code,
+            Offer.origin_airport,
+            Offer.destination_code,
+            Offer.destination_airport,
+            Offer.departure_date,
+        )
+        .distinct(Offer.destination_code, Offer.departure_date)
+        .all()
+    )
+
+    counter = 0
+
+    for f in flights:
+        try:
+            new_data = get_flights(
+                origin=str(f.origin_code),
+                destination=str(f.destination_code),
+                date=str(f.departure_date),
+            )
+            if new_data:
+                new_price_entry = Offer(
+                    origin_code=f.origin_code,
+                    origin_airport=f.origin_airport,
+                    destination_code=f.destination_code,
+                    destination_airport=f.destination_airport,
+                    price=new_data["price"],
+                    departure_date=f.departure_date,
+                    departure_time=new_data["departure_time"],
+                    arrival_time=new_data["arrival_time"],
+                    duration=new_data["duration"],
+                )
+                db.add(new_price_entry)
+                counter += 1
+
+        except Exception as e:
+            print(f"Error updating {f.destination_code}: {e}")
+
+    db.commit()
+
+    return {"status": "success", "added": counter}
 
 
 @app.post("/add-flight")
